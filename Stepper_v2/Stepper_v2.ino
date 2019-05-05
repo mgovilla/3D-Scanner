@@ -45,7 +45,8 @@ void loop () {
           
           Serial.print(r*1.8);
           Serial.print(',');
-          Serial.print(0.0);
+          Serial.print(sensor.readRangeSingleMillimeters());
+          if (sensor.timeoutOccurred()) { Serial.print(0.0); }
           Serial.print(',');
           Serial.print(i*1.8*16);
           Serial.println();
