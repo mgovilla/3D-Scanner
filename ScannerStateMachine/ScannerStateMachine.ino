@@ -14,13 +14,16 @@
 VL53L0X distanceSensor;
 
 File ScanData;
-enum States{WAIT, SLEEP, SCANNING, CALIBRATE, JOG};
-enum States state = WAIT;
+enum States {WAIT, SLEEP, SCANNING, CALIBRATE, JOG};
+States state = WAIT;
 
-int THREADS_INCH = 16.0;
+int THREADS_INCH = 3.2;
 int FileCount = 0;
 
 double offset = 0;
+
+String fileS = "ScanData";
+String txt = ".txt";
 
 void setup () {   // The stepper motor used in the IO pin is set to output
     Serial.begin(9600);
@@ -29,36 +32,54 @@ void setup () {   // The stepper motor used in the IO pin is set to output
     pinMode (X_DIR, OUTPUT); pinMode (X_STP, OUTPUT);
     pinMode (Y_DIR, OUTPUT); pinMode (Y_STP, OUTPUT);
     pinMode (EN, OUTPUT);
+
+    Serial.println("Initialized.");
+    Serial.println(state);
+    
 }
 
 void loop () {
-    RunStateMachine(state);
+
+    RunStateMachine();
+    delay(10);
 } 
 
 
-void RunStateMachine(uint8_t s) {
-  switch(s) {
-    case SCANNING:
+void RunStateMachine() {
+
+   if(state == SCANNING) {
+      Serial.println("Scanning");
+          
       FileCount++;
-      String fileName;
-      fileName = ("ScanData%d.txt", FileCount);
-      ScanData = SD.open(fileName);
+      char fileName[] = "ScanData.txt";
+      sprintf(fileName, "Scan%d.txt", FileCount);
+      Serial.println(fileName);
+      
+      if(!SD.begin(4)) {
+        Serial.println("initialization failed!");
+        state = WAIT;
+        return;
+      }
+      Serial.println("initialization done.");
+      
+      ScanData = SD.open("Scan2.txt", FILE_WRITE);
       if(ScanData) {
+         Serial.println("success");
          ScanData.println("Heading");
       }
 
       Scan();
+      ScanData.close();
       state = WAIT;
-      break;
-    case CALIBRATE:
-      // Change constants (offset, TPI) here, not sure if necessary
+   } else if (state == CALIBRATE) {
       
-      break;
-    case JOG:
+   } else if (state == JOG) {
       // Manually move motors here with user inputs until cancelled, or timer runs out
+     
       digitalWrite (EN, LOW);
       
       if(Serial.available() > 0) {
+        Serial.print(Serial.available());
         int inByte = Serial.read(); 
       
         switch(inByte) {
@@ -82,9 +103,9 @@ void RunStateMachine(uint8_t s) {
         }
       }
       
-      break;
-    case WAIT:
-      // Code for menu items here, transitions to Scan, Calibrate, and Jog
+   } else if (state == WAIT) {
+      // Code for menu items here, transitions to Scan, Calibrate, and Jog   
+      
       if(Serial.available() > 0) {
         int inByte = Serial.read(); 
       
@@ -106,20 +127,16 @@ void RunStateMachine(uint8_t s) {
             break;
         }
       }
-        
-      break;
-    case SLEEP:
+   } else if (state == SLEEP) {
       // Idle motors and shutoff Arduino/Display
       digitalWrite (EN, HIGH);
 
-      if(Serial.available() > 0) {
-        state = WAIT;
+      while(Serial.available() < 1) {
+        Serial.println("SLEEPING");
       }
-      break;
-    default: // Debug
-      Serial.println("Error Occured in State Machine");
-      break;
-  }
+
+      state = WAIT;
+   }
 }
 
 /*
@@ -134,8 +151,8 @@ void Scan () {
 
   digitalWrite (EN, LOW);
   
-  for(int i = 0; i < 3; i++) {
-        for(int j = 1; j < 10; j++) {      // 1 step is 1.8 degrees, 200 for a full revolution before z axis moves
+  for(int i = 0; i < 35; i++) {
+        for(int j = 1; j < 200; j++) {      // 1 step is 1.8 degrees, 200 for a full revolution before z axis moves
           step (false, X_DIR, X_STP, 1.0); // Move that 1 step (subject to change) 
           
           double scanDist; 
@@ -143,10 +160,10 @@ void Scan () {
           if (distanceSensor.timeoutOccurred()) { scanDist = 0.0; } 
           
           printToSD(j, scanDist, i);
-          delayMicroseconds(750);
+          delayMicroseconds(10000);
         }
         
-  step (false, Y_DIR, Y_STP, 25); //Calibrate value to move specific distance
+  step (false, Y_DIR, Y_STP, 20); //Calibrate value to move specific distance
   }
 }
 
@@ -157,7 +174,8 @@ void Scan () {
  */
 void printToSD (double theta, double r, double z) {
           theta = theta * 1.8;
-          z = (z/200.0) / (THREADS_INCH);
+          z = (z)/ (THREADS_INCH*10);
+          r = 95.0 - r;
           double x = r*cos(theta);
           double y = r*sin(theta);
           
