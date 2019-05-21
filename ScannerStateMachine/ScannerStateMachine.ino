@@ -62,7 +62,7 @@ void RunStateMachine() {
       }
       Serial.println("initialization done.");
       
-      ScanData = SD.open("Scan2.txt", FILE_WRITE);
+      ScanData = SD.open(fileName, FILE_WRITE);
       if(ScanData) {
          Serial.println("success");
          ScanData.println("Heading");
@@ -150,17 +150,23 @@ void Scan () {
   distanceSensor.setMeasurementTimingBudget(200000);
 
   digitalWrite (EN, LOW);
-  
-  for(int i = 0; i < 35; i++) {
-        for(int j = 1; j < 200; j++) {      // 1 step is 1.8 degrees, 200 for a full revolution before z axis moves
+  bool c = true;
+  for(int i = 0; i < 35 & c; i++) {
+        for(int j = 1; j < 201 & c; j++) {      // 1 step is 1.8 degrees, 200 for a full revolution before z axis moves
           step (false, X_DIR, X_STP, 1.0); // Move that 1 step (subject to change) 
           
           double scanDist; 
           scanDist = distanceSensor.readRangeSingleMillimeters() - offset;
           if (distanceSensor.timeoutOccurred()) { scanDist = 0.0; } 
-          
+          Serial.println(scanDist);
           printToSD(j, scanDist, i);
           delayMicroseconds(10000);
+          if(Serial.available() > 0) {
+            if(Serial.read() == 'l') {
+              c = false;
+              Serial.println("broken");
+            }
+          }
         }
         
   step (false, Y_DIR, Y_STP, 20); //Calibrate value to move specific distance
@@ -174,8 +180,10 @@ void Scan () {
  */
 void printToSD (double theta, double r, double z) {
           theta = theta * 1.8;
+          theta = theta * PI / 180.0;
+          
           z = (z)/ (THREADS_INCH*10);
-          r = 95.0 - r;
+          r = 110.0 - r;
           double x = r*cos(theta);
           double y = r*sin(theta);
           
