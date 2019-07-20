@@ -6,6 +6,7 @@
 #    Jul 19, 2019 10:03:29 AM EDT  platform: Windows NT
 
 import sys
+import serial
 
 try:
     import Tkinter as tk
@@ -30,7 +31,6 @@ def destroy_window():
     global top_level
     top_level.destroy()
     top_level = None
-
 
 if __name__ == '__main__':
     import ScannerGUI

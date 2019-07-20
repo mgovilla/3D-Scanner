@@ -10,8 +10,10 @@ import serial
 
 try:
     import Tkinter as tk
+    from Tkinter.simpledialog import askstring
 except ImportError:
     import tkinter as tk
+    from tkinter.simpledialog import askstring
 
 try:
     import ttk
@@ -49,7 +51,6 @@ def destroy_TopLevel():
     w = None
 
 class TopLevel:
-    
     def __init__(self, top=None):
         '''This class configures and populates the toplevel window.
            top is the toplevel containing window.'''
@@ -72,6 +73,23 @@ class TopLevel:
         top.configure(highlightbackground="#d9d9d9")
         top.configure(highlightcolor="black")
 
+        # variables that are used throughout the setup
+        self.FileText = tk.StringVar()
+        self.FileText.set('Limit FileName to 8 characters (omit any ending)')
+        
+        self.SDInserted = False
+
+        self.SDText = tk.StringVar()
+        self.SDText.set('SD Card installed: ' + str(self.SDInserted))
+
+        self.v = tk.IntVar() # For the radio buttons
+        self.v.set(0)
+
+        self.DistSensed = 0.0 # For the distance sensed in the label under the Calibration
+
+        self.DistText = tk.StringVar()
+        self.DistText.set('Distance Measured = ' + str(self.DistSensed)) # textvariable for label4
+        # variables that are used throughout the setup
 
         self.Canvas1 = tk.Canvas(top)
         self.Canvas1.place(relx=0.0, rely=0.0, relheight=0.5, relwidth=0.5)
@@ -96,6 +114,8 @@ class TopLevel:
         self.StartScan.configure(highlightcolor="black")
         self.StartScan.configure(pady="0")
         self.StartScan.configure(text='''Start Scan With Name''')
+        self.StartScan.configure(command=self.btnScan)
+        self.StartScan.configure(state='disabled')
 
         self.FileName = tk.Entry(self.Canvas1)
         self.FileName.place(relx=0.033, rely=0.089, relheight=0.104, relwidth=0.537)
@@ -108,17 +128,19 @@ class TopLevel:
         self.FileName.configure(insertbackground="black")
         self.FileName.configure(selectbackground="#c4c4c4")
         self.FileName.configure(selectforeground="black")
+        self.FileName.configure(state='disabled')
 
-        self.Label1 = tk.Label(self.Canvas1)
-        self.Label1.place(relx=0.025, rely=0.2, relheight=0.084, relwidth=0.553)
-        self.Label1.configure(activebackground="#f9f9f9")
-        self.Label1.configure(activeforeground="black")
-        self.Label1.configure(background="#d9d9d9")
-        self.Label1.configure(disabledforeground="#a3a3a3")
-        self.Label1.configure(foreground="#000000")
-        self.Label1.configure(highlightbackground="#d9d9d9")
-        self.Label1.configure(highlightcolor="black")
-        self.Label1.configure(text='''Limit FileName to 8 characters (omit any ending)''')
+        self.FileLabel = tk.Label(self.Canvas1)
+        self.FileLabel.place(relx=0.025, rely=0.2, relheight=0.084, relwidth=0.553)
+        self.FileLabel.configure(activebackground="#f9f9f9")
+        self.FileLabel.configure(activeforeground="black")
+        self.FileLabel.configure(background="#d9d9d9")
+        self.FileLabel.configure(disabledforeground="#a3a3a3")
+        self.FileLabel.configure(foreground="#000000")
+        self.FileLabel.configure(highlightbackground="#d9d9d9")
+        self.FileLabel.configure(highlightcolor="black")
+        self.FileLabel.configure(textvariable=self.FileText)
+        self.FileLabel.configure(state='disabled')
 
         self.Listbox1 = tk.Listbox(self.Canvas1)
         self.Listbox1.place(relx=0.033, rely=0.489, relheight=0.462
@@ -132,7 +154,9 @@ class TopLevel:
         self.Listbox1.configure(highlightcolor="black")
         self.Listbox1.configure(selectbackground="#c4c4c4")
         self.Listbox1.configure(selectforeground="black")
+        self.Listbox1.configure(selectmode='multiple')
         self.Listbox1.configure(width=644)
+        self.Listbox1.configure(state='disabled')
 
         self.Delete = tk.Button(self.Canvas1)
         self.Delete.place(relx=0.625, rely=0.563, relheight=0.104, relwidth=0.313)
@@ -145,6 +169,8 @@ class TopLevel:
         self.Delete.configure(highlightcolor="black")
         self.Delete.configure(pady="0")
         self.Delete.configure(text='''Delete File''')
+        self.Delete.configure(command=self.delFile)
+        self.Delete.configure(state='disabled')
 
         self.Download = tk.Button(self.Canvas1)
         self.Download.place(relx=0.625, rely=0.726, relheight=0.104, relwidth=0.313)
@@ -157,6 +183,7 @@ class TopLevel:
         self.Download.configure(highlightcolor="black")
         self.Download.configure(pady="0")
         self.Download.configure(text='''Download File''')
+        self.Download.configure(state='disabled')
 
         self.Canvas2 = tk.Canvas(top)
         self.Canvas2.place(relx=0.0, rely=0.496, relheight=0.5, relwidth=0.5)
@@ -193,6 +220,7 @@ class TopLevel:
         self.Connect.configure(highlightcolor="black")
         self.Connect.configure(pady="0")
         self.Connect.configure(text='''Connect Via Bluetooth''')
+        self.Connect.configure(command=self.serConnect)
 
         self.ComStatus = tk.Label(self.Canvas3)
         self.ComStatus.place(relx=0.567, rely=0.2, relheight=0.47, relwidth=0.4)
@@ -219,6 +247,7 @@ class TopLevel:
         self.Terminal.configure(selectforeground="black")
         self.Terminal.configure(width=1154)
         self.Terminal.configure(wrap="word")
+        self.Terminal.configure(state='disabled')
 
         self.Canvas4 = tk.Canvas(top)
         self.Canvas4.place(relx=0.5, rely=0.0, relheight=0.571, relwidth=0.5)
@@ -231,6 +260,7 @@ class TopLevel:
         self.Canvas4.configure(selectbackground="#c4c4c4")
         self.Canvas4.configure(selectforeground="black")
         self.Canvas4.configure(width=1183)
+        self.Canvas4.configure(state='disabled')
 
         self.JogUp = tk.Button(self.Canvas4)
         self.JogUp.place(relx=0.333, rely=0.065, relheight=0.156, relwidth=0.2)
@@ -243,6 +273,7 @@ class TopLevel:
         self.JogUp.configure(highlightcolor="black")
         self.JogUp.configure(pady="0")
         self.JogUp.configure(text='''Move Up''')
+        self.JogUp.configure(state='disabled')
 
         self.JogDown = tk.Button(self.Canvas4)
         self.JogDown.place(relx=0.333, rely=0.467, relheight=0.156, relwidth=0.2)
@@ -255,6 +286,7 @@ class TopLevel:
         self.JogDown.configure(highlightcolor="black")
         self.JogDown.configure(pady="0")
         self.JogDown.configure(text='''Move Down''')
+        self.JogDown.configure(state='disabled')
 
         self.JogLeft = tk.Button(self.Canvas4)
         self.JogLeft.place(relx=0.217, rely=0.266, relheight=0.156, relwidth=0.2)
@@ -267,6 +299,7 @@ class TopLevel:
         self.JogLeft.configure(highlightcolor="black")
         self.JogLeft.configure(pady="0")
         self.JogLeft.configure(text='''Rotate Left''')
+        self.JogLeft.configure(state='disabled')
 
         self.JogRight = tk.Button(self.Canvas4)
         self.JogRight.place(relx=0.45, rely=0.266, relheight=0.156, relwidth=0.2)
@@ -279,9 +312,7 @@ class TopLevel:
         self.JogRight.configure(highlightcolor="black")
         self.JogRight.configure(pady="0")
         self.JogRight.configure(text='''Rotate Right''')
-
-        self.v = tk.IntVar()
-        self.v.set(0)
+        self.JogRight.configure(state='disabled')
 
         self.JogRate = tk.Radiobutton(self.Canvas4)
         self.JogRate.place(relx=0.767, rely=0.143, relheight=0.074
@@ -297,6 +328,7 @@ class TopLevel:
         self.JogRate.configure(text='''+ 10 mm/deg''')
         self.JogRate.configure(variable=self.v)
         self.JogRate.configure(value=10)
+        self.JogRate.configure(state='disabled')
         
 
         self.JogRate2 = tk.Radiobutton(self.Canvas4)
@@ -313,6 +345,7 @@ class TopLevel:
         self.JogRate2.configure(text='''+ 05 mm/deg''')
         self.JogRate2.configure(variable=self.v)
         self.JogRate2.configure(value=5)
+        self.JogRate2.configure(state='disabled')
 
         self.JogRate3 = tk.Radiobutton(self.Canvas4)
         self.JogRate3.place(relx=0.767, rely=0.298, relheight=0.074
@@ -328,6 +361,7 @@ class TopLevel:
         self.JogRate3.configure(text='''+ 01 mm/deg''')
         self.JogRate3.configure(variable=self.v)
         self.JogRate3.configure(value=1)
+        self.JogRate3.configure(state='disabled')
 
         self.Home = tk.Button(self.Canvas4)
         self.Home.place(relx=0.717, rely=0.726, relheight=0.195, relwidth=0.246)
@@ -340,6 +374,7 @@ class TopLevel:
         self.Home.configure(highlightcolor="black")
         self.Home.configure(pady="0")
         self.Home.configure(text='''Run Home''')
+        self.Home.configure(state='disabled')
 
         self.Canvas5 = tk.Canvas(top)
         self.Canvas5.place(relx=0.5, rely=0.57, relheight=0.427, relwidth=0.5)
@@ -352,6 +387,7 @@ class TopLevel:
         self.Canvas5.configure(selectbackground="#c4c4c4")
         self.Canvas5.configure(selectforeground="black")
         self.Canvas5.configure(width=1197)
+        self.Canvas5.configure(state='disabled')
 
         self.Label2 = tk.Label(self.Canvas5)
         self.Label2.place(relx=0.033, rely=0.052, relheight=0.133, relwidth=0.313)
@@ -364,6 +400,7 @@ class TopLevel:
         self.Label2.configure(highlightbackground="#d9d9d9")
         self.Label2.configure(highlightcolor="black")
         self.Label2.configure(text='''Calibration Info''')
+        self.Label2.configure(state='disabled')
 
         self.Dist = tk.Label(self.Canvas5)
         self.Dist.place(relx=0.067, rely=0.225, relheight=0.081, relwidth=0.647)
@@ -375,7 +412,8 @@ class TopLevel:
         self.Dist.configure(highlightbackground="#d9d9d9")
         self.Dist.configure(highlightcolor="black")
         self.Dist.configure(anchor='w')
-        self.Dist.configure(text='''Distance Measured:''')
+        self.Dist.configure(textvariable=self.DistText)
+        self.Dist.configure(state='disabled')
 
         self.ZeroSensor = tk.Button(self.Canvas5)
         self.ZeroSensor.place(relx=0.808, rely=0.208, relheight=0.121, relwidth=0.073)
@@ -388,6 +426,7 @@ class TopLevel:
         self.ZeroSensor.configure(highlightcolor="black")
         self.ZeroSensor.configure(pady="0")
         self.ZeroSensor.configure(text='''Zero''')
+        self.ZeroSensor.configure(state='disabled')
 
         self.Label4 = tk.Label(self.Canvas5)
         self.Label4.place(relx=0.067, rely=0.399, relheight=0.081, relwidth=0.297)
@@ -399,7 +438,65 @@ class TopLevel:
         self.Label4.configure(highlightbackground="#d9d9d9")
         self.Label4.configure(highlightcolor="black")
         self.Label4.configure(anchor='w')
-        self.Label4.configure(text='''SD Card installed: ''')
+        self.Label4.configure(textvariable=self.SDText)
+        self.Label4.configure(state='disabled')
+
+        
+    def contains(self, listbox, string):
+        for n in listbox.get(0, tk.END):
+            if(n == string):
+                return True
+        
+        return False
+
+    def btnScan(self):
+        f = self.FileName.get()
+
+        if(' ' in f):
+            f = f.replace(' ', '_')
+
+        if(len(f) > 8):
+            self.FileText.set('ERROR: FileName exceeds 8 characters')
+        elif(len(f) == 0):
+            self.FileText.set('ERROR: Please enter a FileName')
+        elif(self.contains(self.Listbox1, f)):
+            self.FileText.set('ERROR: FileName already exists')
+        else:
+            self.FileText.set('Limit FileName to 8 characters (omit any ending)')
+            self.Listbox1.insert(tk.END, f)
+            self.FileName.delete(0, tk.END)
+
+    def delFile(self):
+        items = *map(int, self.Listbox1.curselection()),
+
+        for index in items:
+            self.Listbox1.delete(index)
+
+    port = 'COM11'
+    def serConnect(self):       
+        global hc
+
+        try:
+            hc = serial.Serial(self.port, 9600, timeout=1)
+        except serial.serialutil.SerialException:
+            print('Not connected')
+            p = askstring("Error", "Are you connected to the HC-05? If you are, enter the COM port and try again")
+            if(p):
+                if(not len(p) == 0): 
+                    self.port = p
+            return
+        
+        if(hc):
+            if(hc.is_open):
+                tk.messagebox.showinfo("Nice", "You are Connected")
+                for w in root.winfo_children():
+                    w.configure(state='normal')
+
+            else:
+                hc.open()
+            
+
+        
 
 if __name__ == '__main__':
     vp_start_gui()
