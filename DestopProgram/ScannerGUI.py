@@ -24,21 +24,76 @@ except ImportError:
 
 import ScannerGUI_support
 
-
-
 def vp_start_gui():
     '''Starting point when module is the main routine.'''
-    global val, w, root
+    global root
     root = tk.Tk()
-    top = TopLevel (root)
+    top = TopLevel(root)
     ScannerGUI_support.init(root, top)
+    
+    
     root.mainloop()
+
+hc = None   
+scanning = False
+connected = False
+
+def readSerial(t):
+    global scanning, hc, root, connected
+    serBuffer = ""
+
+    # print('attempting to read')
+    
+    if(hc):
+        while True:
+            c = hc.read().decode('ascii') # attempt to read a character from Serial
+            
+            # was anything read?
+            if len(c) == 0:
+                break
+            
+            print(c)
+
+            if c == '\r':
+                c = '' # don't want returns. chuck it
+            
+            if(c == 'p'):
+                print('SD Connection Sucessful!')
+                t.SDInserted = True
+                t.SDText.set('SD Card installed: ' + str(t.SDInserted))
+                break
+
+            if(c == 'b' and not connected):
+                connected = True
+                t.serConnect()
+                break
+
+            if(c == 'd'):
+                scanning = False
+                for w in root.winfo_children():
+                    w.configure(state='normal')
+                    for c in w.winfo_children():
+                        c.configure(state='normal')
+
+            
+            if(scanning):
+                
+                if c == '\n':
+                    t.updateDist(serBuffer)
+                    serBuffer = "" # empty the buffer
+                else:
+                    serBuffer += c # add to the buffer
+            
+        
+        root.after(10, readSerial, t) # check serial again soon
+    
+        
     
 
 w = None
 def create_TopLevel(root, *args, **kwargs):
     '''Starting point when module is imported by another program.'''
-    global w, w_win, rt
+    global w, rt
     rt = root
     w = tk.Toplevel (root)
     top = TopLevel (w)
@@ -91,6 +146,8 @@ class TopLevel:
         self.DistText.set('Distance Measured = ' + str(self.DistSensed)) # textvariable for label4
         # variables that are used throughout the setup
 
+
+        # Canvas1 configuration, Top Left of the GUI
         self.Canvas1 = tk.Canvas(top)
         self.Canvas1.place(relx=0.0, rely=0.0, relheight=0.5, relwidth=0.5)
         self.Canvas1.configure(background="#d9d9d9")
@@ -103,6 +160,7 @@ class TopLevel:
         self.Canvas1.configure(selectforeground="black")
         self.Canvas1.configure(width=853)
 
+        # StartScan Configuration, when pressed, calls self.btnScan
         self.StartScan = tk.Button(self.Canvas1)
         self.StartScan.place(relx=0.625, rely=0.089, relheight=0.104, relwidth=0.313)
         self.StartScan.configure(activebackground="#ececec")
@@ -117,6 +175,7 @@ class TopLevel:
         self.StartScan.configure(command=self.btnScan)
         self.StartScan.configure(state='disabled')
 
+        # FileName Configuration, Entry for the filenames
         self.FileName = tk.Entry(self.Canvas1)
         self.FileName.place(relx=0.033, rely=0.089, relheight=0.104, relwidth=0.537)
         self.FileName.configure(background="white")
@@ -130,6 +189,7 @@ class TopLevel:
         self.FileName.configure(selectforeground="black")
         self.FileName.configure(state='disabled')
 
+        # FileLabel Configuration, label for filename errors
         self.FileLabel = tk.Label(self.Canvas1)
         self.FileLabel.place(relx=0.025, rely=0.2, relheight=0.084, relwidth=0.553)
         self.FileLabel.configure(activebackground="#f9f9f9")
@@ -142,6 +202,7 @@ class TopLevel:
         self.FileLabel.configure(textvariable=self.FileText)
         self.FileLabel.configure(state='disabled')
 
+        # Listbox1 Configuration, displays the files that are currently on the SD card
         self.Listbox1 = tk.Listbox(self.Canvas1)
         self.Listbox1.place(relx=0.033, rely=0.489, relheight=0.462
                 , relwidth=0.537)
@@ -158,6 +219,7 @@ class TopLevel:
         self.Listbox1.configure(width=644)
         self.Listbox1.configure(state='disabled')
 
+        # Delete Configuration, calls self.delFile to delete the selection from Listbox1
         self.Delete = tk.Button(self.Canvas1)
         self.Delete.place(relx=0.625, rely=0.563, relheight=0.104, relwidth=0.313)
         self.Delete.configure(activebackground="#ececec")
@@ -172,6 +234,7 @@ class TopLevel:
         self.Delete.configure(command=self.delFile)
         self.Delete.configure(state='disabled')
 
+        # Download Configuration, currently not active
         self.Download = tk.Button(self.Canvas1)
         self.Download.place(relx=0.625, rely=0.726, relheight=0.104, relwidth=0.313)
         self.Download.configure(activebackground="#ececec")
@@ -273,6 +336,7 @@ class TopLevel:
         self.JogUp.configure(highlightcolor="black")
         self.JogUp.configure(pady="0")
         self.JogUp.configure(text='''Move Up''')
+        self.JogUp.configure(command= lambda: self.jog(True))
         self.JogUp.configure(state='disabled')
 
         self.JogDown = tk.Button(self.Canvas4)
@@ -286,6 +350,7 @@ class TopLevel:
         self.JogDown.configure(highlightcolor="black")
         self.JogDown.configure(pady="0")
         self.JogDown.configure(text='''Move Down''')
+        self.JogDown.configure(command= lambda: self.jog(False))
         self.JogDown.configure(state='disabled')
 
         self.JogLeft = tk.Button(self.Canvas4)
@@ -299,6 +364,7 @@ class TopLevel:
         self.JogLeft.configure(highlightcolor="black")
         self.JogLeft.configure(pady="0")
         self.JogLeft.configure(text='''Rotate Left''')
+        self.JogLeft.configure(command= lambda:self.rotate(True))
         self.JogLeft.configure(state='disabled')
 
         self.JogRight = tk.Button(self.Canvas4)
@@ -312,6 +378,7 @@ class TopLevel:
         self.JogRight.configure(highlightcolor="black")
         self.JogRight.configure(pady="0")
         self.JogRight.configure(text='''Rotate Right''')
+        self.JogRight.configure(command=lambda: self.rotate(False))
         self.JogRight.configure(state='disabled')
 
         self.JogRate = tk.Radiobutton(self.Canvas4)
@@ -443,6 +510,7 @@ class TopLevel:
 
         
     def contains(self, listbox, string):
+        # """Checks if the listbox contains a string"""
         for n in listbox.get(0, tk.END):
             if(n == string):
                 return True
@@ -450,6 +518,8 @@ class TopLevel:
         return False
 
     def btnScan(self):
+        # """Check the validity of the filename and send this to the HC-05"""
+        global scanning, hc
         f = self.FileName.get()
 
         if(' ' in f):
@@ -465,43 +535,95 @@ class TopLevel:
             self.FileText.set('Limit FileName to 8 characters (omit any ending)')
             self.Listbox1.insert(tk.END, f)
             self.FileName.delete(0, tk.END)
+            
+            hc.write(b'r') # Character which means to start the scanner
+            hc.write(str.encode(f)) # Send the filename to the Arduino 
+            
+            scanning = True
+
+            for w in root.winfo_children():
+                w.configure(state='disabled')
+                for c in w.winfo_children():
+                    if(not c == self.Dist):
+                        c.configure(state='disabled')
+
+
 
     def delFile(self):
+        # """Delete the selected files from the listbox"""
         items = *map(int, self.Listbox1.curselection()),
 
         for index in items:
             self.Listbox1.delete(index)
 
-    port = 'COM11'
-    def serConnect(self):       
+    
+    port = 'COM12'
+    def serConnect(self): 
+        # """Connect to the serial port of the HC-05 and if the connection is successful, enable the application"""      
+        global hc, root, connected
+        
+        if(not connected):
+            try:
+                hc = serial.Serial(self.port, 9600, timeout=0, write_timeout=0)
+                # here, send a signal and expect an echo before confirming that the connection is established
+                hc.write(b'b')
+                root.after(100, readSerial, self)
+
+            except serial.serialutil.SerialException:
+                print('Not connected')
+                p = askstring("Error", "Are you connected to the HC-05? If you are, enter the COM port and try again")
+                if(p):
+                    if(not len(p) == 0): 
+                        self.port = p
+        else:    
+            if(hc):
+                if(hc.is_open):
+                    tk.messagebox.showinfo("Nice", "You are Connected")
+                
+                    for w in root.winfo_children():
+                        w.configure(state='normal')
+                        for c in w.winfo_children():
+                            c.configure(state='normal')
+                    
+                    self.Connect.configure(state='disabled')
+                    
+                else:
+                    print('waiting for connection')
+
+    def int_to_bytes(self, i: int, *, signed: bool = False) -> bytes:
+        length = ((i + ((i * signed) < 0)).bit_length() + 7 + signed) // 8
+        return i.to_bytes(length, byteorder='big', signed=signed)
+
+    def jog(self, up):
         global hc
 
-        try:
-            hc = serial.Serial(self.port, 9600, timeout=1)
-        except serial.serialutil.SerialException:
-            print('Not connected')
-            p = askstring("Error", "Are you connected to the HC-05? If you are, enter the COM port and try again")
-            if(p):
-                if(not len(p) == 0): 
-                    self.port = p
-            return
-        
-        if(hc):
-            if(hc.is_open):
-                tk.messagebox.showinfo("Nice", "You are Connected")
-                for w in root.winfo_children():
-                    w.configure(state='normal')
+        b = self.int_to_bytes(self.v.get())
+        hc.write(b'j')
 
-            else:
-                hc.open()
+        if(up):
+            hc.write(b'w')
+        else:
+            hc.write(b's')
             
+        hc.write(b)
 
-        
+    def rotate(self, left):
+        global hc
+
+        b = self.int_to_bytes(self.v.get())
+        hc.write(b'j')
+
+        if(left):
+            hc.write(b'a')
+        else:
+            hc.write(b'd')
+            
+        hc.write(b)
+
+    def updateDist(self, d):
+        """Updates the current distance value through the DistText variable, takes d as str"""
+        self.DistText.set('Distance Measured = ' + d)
+         
 
 if __name__ == '__main__':
     vp_start_gui()
-
-
-
-
-

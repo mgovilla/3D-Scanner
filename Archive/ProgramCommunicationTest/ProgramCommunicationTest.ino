@@ -17,10 +17,11 @@ File ScanData;
 enum States {WAIT, SLEEP, SCANNING, CALIBRATE, JOG};
 States state = WAIT;
 
-int THREADS_INCH = 3.2; // Constant to calculate rotations/inch for the z-axis
+int THREADS_INCH = 3.2;
 int FileCount = 0;
 
 double offset = 0;
+bool confirmed = false;
 
 String fileS = "ScanData";
 String txt = ".txt";
@@ -32,9 +33,6 @@ void setup () {   // The stepper motor used in the IO pin is set to output
     pinMode (X_DIR, OUTPUT); pinMode (X_STP, OUTPUT);
     pinMode (Y_DIR, OUTPUT); pinMode (Y_STP, OUTPUT);
     pinMode (EN, OUTPUT);
-
-    Serial.println("Initialized.");
-    Serial.println(state);
     
 }
 
@@ -44,95 +42,105 @@ void loop () {
     delay(10);
 } 
 
-
+String FileName;
+char temp; 
 void RunStateMachine() {
 
-   if(state == SCANNING) {
-      Serial.println("Scanning");
+   if(state == SCANNING) { 
+      if(Serial.available() > 0) {
+               
+        while(Serial.available() > 0) {
+          temp = Serial.read();
+          FileName = String(FileName + temp);
+        }
+        
+        Serial.write('p');
+         
+        for(int i = 0; i < 10; i++) {
           
-      FileCount++;
-      char fileName[] = "ScanData.txt";
-      sprintf(fileName, "Scan%d.txt", FileCount);
-      Serial.println(fileName);
-      
-      if(!SD.begin(4)) {
-        Serial.println("initialization failed!");
+          Serial.println(int(1022 + i));
+          delay(10);
+        }
+        
+        Serial.write('d');
         state = WAIT;
-        return;
       }
-      Serial.println("initialization done.");
       
-      ScanData = SD.open(fileName, FILE_WRITE);
-      if(ScanData) {
-         Serial.println("success");
-         ScanData.println("Heading");
-      }
-
-      Scan();
-      ScanData.close();
-      state = WAIT;
    } else if (state == CALIBRATE) {
       
    } else if (state == JOG) {
       // Manually move motors here with user inputs until cancelled, or timer runs out
      
-      digitalWrite (EN, LOW);
+      //digitalWrite (EN, LOW);
       
-      if(Serial.available() > 0) {
-        Serial.print(Serial.available());
-        int inByte = Serial.read(); 
+      if(Serial.available() > 1) {
+        char inByte = Serial.read();
+        int rate = Serial.read();
       
         switch(inByte) {
           case 'a':
-            step (false, X_DIR, X_STP, 10);
+            digitalWrite(7, HIGH);
+            delay(rate*100);
+            digitalWrite(7, LOW);
             break;
           case 'd':
-            step (true, X_DIR, X_STP, 10);
+            digitalWrite(7, HIGH);
+            delay(rate*100);
+            digitalWrite(7, LOW);
             break;
           case 'w':
-            step (false, Y_DIR, Y_STP, 10);
+            digitalWrite(7, HIGH);
+            delay(rate*100);
+            digitalWrite(7, LOW);
             break;
           case 's':
-            step (true, Y_DIR, Y_STP, 10);
-            break;
-          case 'c':
-            state = WAIT;
+            digitalWrite(7, HIGH);
+            delay(rate*100);
+            digitalWrite(7, LOW);
             break;
           default:
             break;  
         }
+
+        state = WAIT;
+        
       }
       
    } else if (state == WAIT) {
       // Code for menu items here, transitions to Scan, Calibrate, and Jog   
       
       if(Serial.available() > 0) {
-        int inByte = Serial.read(); 
-      
-        switch(inByte) {
-          case 'c':
-            state = CALIBRATE;
-            break;
-          case 'j':
-            state = JOG;
-            break;
-          case 's':
-            state = SLEEP;
-            break;
-          case 'r':
-            state = SCANNING;
-            break;
-          default:
-            state = WAIT;
-            break;
-        }
+        char inByte = Serial.read(); 
+        
+          switch(inByte) {
+            case 'c':
+              state = CALIBRATE;
+              break;
+            case 'j':
+              state = JOG;
+              break;
+            case 's':
+              state = SLEEP;
+              break;
+            case 'r':
+              state = SCANNING;
+              break;
+            case 'b':
+              Serial.write('b');
+              break;
+            default:
+              state = WAIT;
+              break;
+          }
+        
       }
+      
    } else if (state == SLEEP) {
       // Idle motors and shutoff Arduino/Display
       digitalWrite (EN, HIGH);
 
       while(Serial.available() < 1) {
-        Serial.println("SLEEPING");
+        
       }
 
       state = WAIT;

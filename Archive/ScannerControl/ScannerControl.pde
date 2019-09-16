@@ -5,7 +5,7 @@ String ledStatus="LED: OFF";
 
 void setup() {
   size(450, 500);
-  myPort = new Serial(this, "COM11", 9600); // Starts the serial communication
+  myPort = new Serial(this, "COM12", 9600); // Starts the serial communication
   myPort.bufferUntil('\n'); // Defines up to which character the data from the serial port will be read. The character '\n' or 'New Line'
 }
 
